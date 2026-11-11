@@ -1,0 +1,13 @@
+{
+  "name": "math-mob",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "dotnet watch run --project MathMob.Web",
+    "check": "node tools/check.js",
+    "test": "node tools/check.js && node tools/collision-test.js"
+  },
+  "devDependencies": {
+    "@napi-rs/canvas": "^1.1.0"
+  }
+}

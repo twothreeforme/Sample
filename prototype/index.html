@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Math Mob</title>
+<style>
+  html,body{margin:0;height:100%;background:#0b1020;overflow:hidden;font-family:system-ui,Segoe UI,Arial,sans-serif;color:#fff;touch-action:none;user-select:none;-webkit-user-select:none}
+  body{display:flex;align-items:center;justify-content:center}
+  #app{position:relative;height:min(100vh,166.6vw);aspect-ratio:3/5;font-size:calc(min(100vh,166.6vw)/50)}
+  canvas{width:100%;height:100%;display:block;background:#12204a;touch-action:none}
+  .ov{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;background:rgba(8,12,30,.94);padding:2em 1.5em;box-sizing:border-box;overflow:auto}
+  .ov.show{display:flex}
+  h1{font-size:3em;margin:.2em 0 .1em}
+  h2{font-size:2.2em;margin:.2em 0}
+  .sub{opacity:.75;margin:0 0 1em;font-size:1.3em;text-align:center}
+  .mod{width:100%;margin:.5em 0 .2em;font-size:1.15em;opacity:.7;text-transform:uppercase;letter-spacing:.06em}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:.6em;width:100%}
+  button{font:inherit;color:#fff;border:0;cursor:pointer}
+  .lv{background:#25418f;border-radius:.7em;padding:.7em .8em;text-align:left;font-size:1.25em}
+  .lv small{display:block;opacity:.8;font-size:.8em}
+  .lv.locked{background:#2a2f45;opacity:.5;cursor:default}
+  .stars{color:#ffd23f;letter-spacing:.1em}
+  .btn{background:#2fbf71;border-radius:.8em;padding:.6em 1.4em;font-size:1.6em;margin:.4em;font-weight:700}
+  .btn.alt{background:#3b4a7a}
+  .row{display:flex;flex-wrap:wrap;justify-content:center}
+  #bigstars{font-size:4em;color:#ffd23f}
+  .rev{width:100%;font-size:1.3em;background:#1b2550;border-radius:.6em;padding:.5em .8em;margin:.3em 0}
+  .rev b{color:#7dffb0}
+  #menuBtn{position:absolute;top:.6em;right:.6em;background:#0008;border-radius:.5em;padding:.3em .7em;font-size:1.3em;display:none}
+  #link{margin-top:1em;font-size:1.1em;opacity:.5;background:none;text-decoration:underline}
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="c" width="480" height="800"></canvas>
+  <button id="menuBtn">Menu</button>
+  <div id="menu" class="ov show"></div>
+  <div id="result" class="ov"></div>
+</div>
+
+<script>
+// ================= Problem generators (4th grade, Eureka Math modules 1-7) =================
+const rnd=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
+const pick=a=>a[rnd(0,a.length-1)];
+const fmt=n=>n.toLocaleString('en-US');
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=rnd(0,i);[a[i],a[j]]=[a[j],a[i]];}return a;}
+const frac=(n,d)=>n+'/'+d;
+
+// replace first number in string with a nearby number (fallback distractor)
+function bump(s,k){
+  const m=s.match(/\d[\d,]*(\.\d+)?/); if(!m) return s+'!'.repeat(k);
+  const dec=m[1]?m[1].length-1:0, v=parseFloat(m[0].replace(/,/g,''));
+  const delta=(k%2?1:-1)*Math.ceil(k/2)*Math.pow(10,-dec);
+  const nv=v+delta; if(nv<0) return s+'!';
+  const t=dec?nv.toFixed(dec):((m[0].includes(',')||nv>=10000)?fmt(nv):String(nv));
+  return s.replace(m[0],t);
+}
+// build a problem: q text, correct answer a, candidate distractors ds (strings)
+function P(q,a,ds){
+  a=String(a); const set=[];
+  for(const d of shuffle(ds.map(String))) if(d!==a&&!set.includes(d)&&!/(^|[^\d])-\d/.test(d)&&!/^0(\D|$)/.test(d)) set.push(d);
+  for(let k=1;set.length<2&&k<60;k++){const d=bump(a,k); if(d!==a&&!set.includes(d)) set.push(d);}
+  return {q,a,d:set.slice(0,2)};
+}
+
+// ---- Module 1: place value, rounding, add/subtract
+function gRound(d){
+  const dig=d>1?5:4, n=rnd(Math.pow(10,dig-1),Math.pow(10,dig)-1);
+  const ps=dig===4?[10,100,1000]:[100,1000,10000], p=pick(ps);
+  const nm={10:'ten',100:'hundred',1000:'thousand',10000:'ten thousand'};
+  const r=x=>fmt(Math.round(n/x)*x);
+  return P(`Round ${fmt(n)} to the nearest ${nm[p]}.`, r(p), ps.concat([10,100,1000,10000]).filter(x=>x!==p).map(r));
+}
+function gValue(){
+  let n,pos,dg,s;
+  do{ n=rnd(10000,99999); s=String(n); pos=rnd(1,3); dg=+s[s.length-1-pos]; }
+  while(dg===0 || s.split(String(dg)).length!==2);
+  const pw=Math.pow(10,pos);
+  return P(`What is the value of the ${dg} in ${fmt(n)}?`, fmt(dg*pw), [fmt(dg*pw*10),fmt(dg*pw/10),String(dg)]);
+}
+function gAdd(){
+  const x=rnd(1200,6800), y=rnd(1200,6800), a=x+y;
+  return P(`${fmt(x)} + ${fmt(y)} = ?`, fmt(a), [fmt(a+10),fmt(a-100),fmt(a+1000),fmt(a-10)]);
+}
+function gSub(){
+  const x=rnd(5000,9999), y=rnd(1100,x-1100), a=x-y;
+  return P(`${fmt(x)} − ${fmt(y)} = ?`, fmt(a), [fmt(a+10),fmt(a-10),fmt(a+100),fmt(a+1000)]);
+}
+// ---- Module 2: unit conversions
+const CONV=[['km','m',1000],['m','cm',100],['kg','g',1000],['L','mL',1000],['cm','mm',10],['hr','min',60],['min','s',60]];
+function gConv(d){
+  const [u1,u2,f]=pick(CONV), n=rnd(2,9);
+  if(d<2) return P(`${n} ${u1} = ? ${u2}`, `${fmt(n*f)} ${u2}`, [`${fmt(n*f*10)} ${u2}`,`${fmt(n*f/10)} ${u2}`,`${n+f} ${u2}`]);
+  const extra=f===1000?pick([100,250,500,750]):f===100?rnd(1,9)*10:f===10?rnd(1,9):pick([15,30,45]);
+  return P(`${n} ${u1} ${extra} ${u2} = ? ${u2}`, `${fmt(n*f+extra)} ${u2}`, [`${fmt(n*f)} ${u2}`,`${fmt(n*f+extra*10)} ${u2}`,`${fmt(n+extra)} ${u2}`]);
+}
+// ---- Module 3: multiply & divide
+function gMul(d){
+  let x,y;
+  if(d<2){x=rnd(12,99);y=rnd(3,9);}
+  else if(Math.random()<.5){x=rnd(120,999);y=rnd(2,9);}
+  else{x=rnd(12,45);y=rnd(11,30);}
+  const a=x*y;
+  return P(`${fmt(x)} × ${y} = ?`, fmt(a), [fmt(a+10),fmt(a-10),fmt(a+100),fmt(a-100)]);
+}
+function gDiv(){
+  const v=rnd(2,9), q=rnd(11,99);
+  return P(`${fmt(v*q)} ÷ ${v} = ?`, fmt(q), [fmt(q+1),fmt(q-1),fmt(q+10),fmt(q-10)]);
+}
+function gRem(){
+  const v=rnd(3,9), q=rnd(8,30), r=rnd(1,v-1), n=v*q+r;
+  return P(`${n} ÷ ${v} = ? R ?`, `${q} R ${r}`, [`${q} R ${r+1<v?r+1:r-1}`,`${q+1} R ${r}`,`${q} R ${v-r}`]);
+}
+// ---- Module 4: angles
+function gAngle(){
+  const t=rnd(0,4);
+  if(t===0){ const x=rnd(2,17)*5; return P(`Two angles make a right angle. One is ${x}°. The other is?`, `${90-x}°`, [`${x}°`,`${180-x}°`,`${90+x}°`]); }
+  if(t===1){ let y; do{y=rnd(4,16)*10;}while(y===90); return P(`Two angles make a straight line. One is ${y}°. The other is?`, `${180-y}°`, [`${y}°`,`${360-y}°`,`${90-Math.abs(y-90)}°`]); }
+  if(t===2){ const T=pick([['¼ turn',90],['½ turn',180],['¾ turn',270],['full turn',360],['⅓ turn',120]]);
+    return P(`A ${T[0]} is how many degrees?`, `${T[1]}°`, [90,180,270,360,120,45].filter(x=>x!==T[1]).map(x=>x+'°')); }
+  if(t===3){ const a=rnd(2,9)*10, b=rnd(2,9)*10; return P(`Angle A is ${a}° and angle B is ${b}°, side by side. Together they make?`, `${a+b}°`, [`${Math.abs(a-b)||a+10}°`,`${a+b+10}°`,`${a+b-10}°`]); }
+  return P(`A right angle measures how many degrees?`, '90°', ['180°','45°','60°']);
+}
+// ---- Module 5: fractions
+function gEquiv(){
+  const den=pick([2,3,4,5,6]), m=pick([2,3,4,5,6]), num=rnd(1,den-1), a=num*m;
+  return P(`${frac(num,den)} = ?/${den*m}`, a, [a+1,a-1,num+m,a+2]);
+}
+function gFracAdd(){
+  const den=rnd(5,12), n1=rnd(1,den-2), n2=rnd(1,den-1-n1), s=n1+n2;
+  return P(`${frac(n1,den)} + ${frac(n2,den)} = ?`, frac(s,den), [frac(s,den*2),frac(s+1,den),frac(Math.abs(n1-n2)||1,den)]);
+}
+function gFracSub(){
+  const den=rnd(4,10), n=rnd(1,den-1);
+  return P(`1 − ${frac(n,den)} = ?`, frac(den-n,den), [frac(n,den),frac(den-n,den*2),frac(den-n+1,den)]);
+}
+function gFracMul(){
+  const k=rnd(2,6), n=rnd(2,5), den=rnd(n+1,10);
+  return P(`${k} × ${frac(n,den)} = ?`, frac(k*n,den), [frac(k*n,den*k),frac(k+n,den),frac(k*n,den+k)]);
+}
+// ---- Module 6: decimals
+function gDec(d){
+  const t=d<2?rnd(0,2):rnd(1,3);
+  if(t===0){ const n=rnd(1,9); return P(`${frac(n,10)} = ? (decimal)`, (n/10).toFixed(1), [(n/100).toFixed(2),(n/10+1).toFixed(1),(n/100+.1).toFixed(2)]); }
+  if(t===1){ let n; do{n=rnd(11,99);}while(n%10===0); return P(`${frac(n,100)} = ? (decimal)`, (n/100).toFixed(2), [(n/10).toFixed(1),(n/1000).toFixed(3),(n/100+1).toFixed(2)]); }
+  if(t===2){ const n=rnd(1,9); return P(`0.${n} = ?`, frac(n,10), [frac(n,100),frac(n*10,10),frac(1,n+1)]); }
+  const tn=rnd(1,8), h=rnd(11,49); let hh=h; if(hh%10===0) hh++;
+  const s=tn*10+hh;
+  return P(`${(tn/10).toFixed(1)} + ${(hh/100).toFixed(2)} = ?`, (s/100).toFixed(2), [((tn+hh)/100).toFixed(2),((s+10)/100).toFixed(2),((s-10)/100).toFixed(2)]);
+}
+// ---- Module 7: measurement with multiplication
+function gArea(){
+  const l=rnd(6,15), w=rnd(3,9);
+  if(Math.random()<.5) return P(`A rectangle is ${l} m long and ${w} m wide. Its area is?`, `${l*w} sq m`, [`${2*(l+w)} sq m`,`${l+w} sq m`,`${l*w+l} sq m`]);
+  return P(`A rectangle is ${l} m long and ${w} m wide. Its perimeter is?`, `${2*(l+w)} m`, [`${l*w} m`,`${l+w} m`,`${2*l+w} m`]);
+}
+function gWord(){
+  if(Math.random()<.5){ const w=rnd(3,9), l=rnd(4,12), A=w*l; return P(`A rectangle has area ${A} sq ft and width ${w} ft. Its length is?`, `${l} ft`, [`${A-w} ft`,`${A*w} ft`,`${l*2} ft`]); }
+  const n=rnd(6,25), k=rnd(3,9);
+  return P(`A rope is ${k} times as long as a ${n} cm string. How long is the rope?`, `${n*k} cm`, [`${n+k} cm`,`${n*k+n} cm`,`${n*k-n} cm`]);
+}
+
+const LEVELS=[
+  {mod:'Module 1',name:'Place Value & Rounding',g:3,gens:[()=>gRound(1),gValue]},
+  {mod:'Module 1',name:'Add & Subtract',g:4,gens:[gAdd,gSub,()=>gRound(2)]},
+  {mod:'Module 2',name:'Metric Units',g:3,gens:[()=>gConv(1)]},
+  {mod:'Module 2',name:'Convert & Combine',g:4,gens:[()=>gConv(2),()=>gConv(1)]},
+  {mod:'Module 3',name:'Multiply',g:3,gens:[()=>gMul(1)]},
+  {mod:'Module 3',name:'Multiply Bigger',g:4,gens:[()=>gMul(2)]},
+  {mod:'Module 3',name:'Divide',g:4,gens:[gDiv,gRem]},
+  {mod:'Module 4',name:'Angles',g:4,gens:[gAngle]},
+  {mod:'Module 5',name:'Equivalent Fractions',g:3,gens:[gEquiv,gFracAdd]},
+  {mod:'Module 5',name:'Fraction Operations',g:4,gens:[gFracAdd,gFracSub,gFracMul]},
+  {mod:'Module 6',name:'Decimals',g:3,gens:[()=>gDec(1)]},
+  {mod:'Module 6',name:'Decimal Fractions',g:4,gens:[()=>gDec(2)]},
+  {mod:'Module 7',name:'Area & Perimeter',g:3,gens:[gArea]},
+  {mod:'Module 7',name:'Word Problems',g:4,gens:[gWord,gArea]},
+];
+
+// ================= Game =================
+const W=480,H=800,MARGIN=14,GAP=10,LANES=3,LANE_W=(W-2*MARGIN-GAP*(LANES-1))/LANES;
+const ROW0=610,ROW_STEP=105,GATE_H=44,ENEMY_B=150,CANNON_Y=735,MULT=2,SPEED=320,FIRE_DT=.07,AMMO=24,MAXMEN=700;
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+const $=id=>document.getElementById(id);
+let S=null, save=load(), lastT=0, keys={};
+
+function load(){try{return Object.assign({unlocked:1,stars:{}},JSON.parse(localStorage.getItem('mathmob')||'{}'));}catch(e){return{unlocked:1,stars:{}};}}
+function store(){try{localStorage.setItem('mathmob',JSON.stringify(save));}catch(e){}}
+
+// tiny sound effects
+let AC=null;
+function beep(f,d,type='sine',v=.08){try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();const o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.value=f;g.gain.value=v;o.connect(g);g.connect(AC.destination);o.start();g.gain.exponentialRampToValueAtTime(.0001,AC.currentTime+d);o.stop(AC.currentTime+d);}catch(e){}}
+
+function laneX(i){return MARGIN+i*(LANE_W+GAP);}
+
+function startLevel(i){
+  const L=LEVELS[i], rows=[];
+  for(let r=0;r<L.g;r++){
+    const p=pick(L.gens)(), ch=shuffle([p.a,...p.d]);
+    rows.push({y:ROW0-r*ROW_STEP,q:p.q,ch,ci:ch.indexOf(p.a),first:null,firstOK:null,flash:[0,0,0]});
+  }
+  const hp=Math.round(AMMO*Math.pow(MULT,L.g)*(0.22+0.02*i));
+  S={lv:i,rows,men:[],ammo:AMMO,hp,hpMax:hp,cx:W/2,tx:W/2,firing:false,fireT:0,phase:'ready',hitFlash:0,t:0};
+  $('menu').classList.remove('show');$('result').classList.remove('show');$('menuBtn').style.display='block';
+}
+
+function spawn(x,y,vx,next){S.men.push({x,y,vx,next});}
+
+function step(dt){
+  if(!S) return;
+  S.t+=dt;
+  const kd=(keys.ArrowRight||keys.d?1:0)-(keys.ArrowLeft||keys.a?1:0);
+  if(kd){S.tx=Math.max(MARGIN,Math.min(W-MARGIN,S.tx+kd*380*dt)); if(S.phase==='ready'&&false)0;}
+  S.cx+=(S.tx-S.cx)*Math.min(1,dt*18);
+  for(const r of S.rows) for(let i=0;i<LANES;i++) if(r.flash[i]>0) r.flash[i]-=dt;
+  if(S.hitFlash>0) S.hitFlash-=dt;
+  if(S.phase==='done') return;
+
+  if(S.phase==='play'){
+    if(S.firing&&S.ammo>0){
+      S.fireT-=dt;
+      while(S.fireT<=0&&S.ammo>0){spawn(S.cx+rnd(-3,3),CANNON_Y-20,rnd(-8,8),0);S.ammo--;S.fireT+=FIRE_DT;}
+    } else S.fireT=Math.min(S.fireT,0);
+  }
+  const add=[];
+  for(const m of S.men){
+    m.y-=SPEED*dt; m.x+=m.vx*dt; m.vx*=Math.pow(.2,dt);
+    if(m.x<8){m.x=8;m.vx=Math.abs(m.vx);} if(m.x>W-8){m.x=W-8;m.vx=-Math.abs(m.vx);}
+    while(!m.dead&&m.next<S.rows.length&&m.y<=S.rows[m.next].y){
+      const row=S.rows[m.next];
+      let lane=Math.round((m.x-MARGIN-LANE_W/2)/(LANE_W+GAP)); lane=Math.max(0,Math.min(LANES-1,lane));
+      row.flash[lane]=.3;
+      const ok=lane===row.ci;
+      if(row.first===null){row.first=lane;row.firstOK=ok;beep(ok?660:180,.18,ok?'sine':'sawtooth');}
+      if(ok){
+        if(S.men.length+add.length<MAXMEN) for(let k=0;k<MULT-1;k++) add.push({x:m.x+rnd(-6,6),y:m.y,vx:rnd(-90,90),next:m.next+1});
+        m.next++;
+      } else m.dead=true;
+    }
+    if(!m.dead&&m.y<=ENEMY_B){m.dead=true;S.hp--;S.hitFlash=.08;}
+  }
+  S.men.push(...add);
+  S.men=S.men.filter(m=>!m.dead);
+  if(S.hp<=0) finish(true);
+  else if(S.ammo<=0&&S.men.length===0) finish(false);
+}
+
+function finish(win){
+  S.phase='done';
+  const wrong=S.rows.filter(r=>r.firstOK!==true);
+  let stars=0;
+  if(win){stars=wrong.length===0?3:wrong.length===1?2:1;
+    save.stars[S.lv]=Math.max(save.stars[S.lv]||0,stars);
+    save.unlocked=Math.max(save.unlocked,Math.min(LEVELS.length,S.lv+2)); store(); beep(880,.4);}
+  else beep(120,.5,'sawtooth');
+  const L=LEVELS[S.lv], hasNext=win&&S.lv+1<LEVELS.length;
+  $('result').innerHTML=`
+    <h2>${win?'Level Cleared!':'Out of mob!'}</h2>
+    <div id="bigstars">${win?'★'.repeat(stars)+'☆'.repeat(3-stars):''}</div>
+    <p class="sub">${L.mod}: ${L.name}${win?'':'<br>Hint: aim at the correct answer to double your mob.'}</p>
+    ${wrong.length?'<div class="mod">Review</div>'+wrong.map(r=>`<div class="rev">${r.q}<br>Answer: <b>${r.ch[r.ci]}</b></div>`).join(''):'<p class="sub">Perfect — every answer correct!</p>'}
+    <div class="row">
+      ${hasNext?'<button class="btn" id="nextB">Next Level</button>':''}
+      <button class="btn ${hasNext?'alt':''}" id="againB">${win?'Replay':'Try Again'}</button>
+      <button class="btn alt" id="menuB">Menu</button>
+    </div>`;
+  $('result').classList.add('show');
+  if(hasNext) $('nextB').onclick=()=>startLevel(S.lv+1);
+  $('againB').onclick=()=>startLevel(S.lv);
+  $('menuB').onclick=showMenu;
+}
+
+// ---------- drawing ----------
+function wrapText(t,maxW){
+  const words=t.split(' '),lines=[];let cur='';
+  for(const w of words){const test=cur?cur+' '+w:w; if(ctx.measureText(test).width>maxW&&cur){lines.push(cur);cur=w;}else cur=test;}
+  lines.push(cur);return lines;
+}
+function rr(x,y,w,h,r){ctx.beginPath();ctx.roundRect?ctx.roundRect(x,y,w,h,r):ctx.rect(x,y,w,h);}
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#1a2b66');g.addColorStop(1,'#0e1736');
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  if(!S) return;
+  // lane guides
+  ctx.strokeStyle='rgba(255,255,255,.05)';ctx.lineWidth=2;
+  for(let i=0;i<LANES;i++){ctx.strokeRect(laneX(i),ENEMY_B,LANE_W,H-ENEMY_B);}
+  // enemy
+  const ef=S.hitFlash>0;
+  ctx.fillStyle=ef?'#ff9a9a':'#c0392b';rr(MARGIN,36,W-2*MARGIN,ENEMY_B-46,14);ctx.fill();
+  ctx.fillStyle='#fff';ctx.font='bold 44px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(Math.max(0,S.hp),W/2,36+(ENEMY_B-46)/2-4);
+  const bw=W-2*MARGIN-40;ctx.fillStyle='#0006';ctx.fillRect(W/2-bw/2,ENEMY_B-24,bw,8);
+  ctx.fillStyle='#ffd23f';ctx.fillRect(W/2-bw/2,ENEMY_B-24,bw*Math.max(0,S.hp)/S.hpMax,8);
+  // gate rows
+  for(let ri=0;ri<S.rows.length;ri++){
+    const r=S.rows[ri];
+    ctx.font='bold 19px system-ui';ctx.textAlign='center';ctx.textBaseline='alphabetic';
+    const lines=wrapText(r.q,W-30);
+    ctx.fillStyle='#fff';
+    lines.forEach((ln,i)=>ctx.fillText(ln,W/2,r.y-GATE_H/2-8-(lines.length-1-i)*22));
+    for(let i=0;i<LANES;i++){
+      const f=r.flash[i]>0, ok=i===r.ci;
+      let col='#3a5bd9';
+      if(f) col=ok?'#2fbf71':'#e74c3c';
+      ctx.fillStyle=col;rr(laneX(i),r.y-GATE_H/2,LANE_W,GATE_H,10);ctx.fill();
+      ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=2;ctx.stroke();
+      ctx.fillStyle='#fff';ctx.font='bold 23px system-ui';ctx.textBaseline='middle';
+      ctx.fillText(r.ch[i],laneX(i)+LANE_W/2,r.y+1);
+    }
+  }
+  // men
+  ctx.fillStyle='#7fd4ff';
+  for(const m of S.men){ctx.beginPath();ctx.arc(m.x,m.y,5,0,6.3);ctx.fill();}
+  // cannon
+  ctx.fillStyle='#ffd23f';ctx.beginPath();ctx.moveTo(S.cx,CANNON_Y-24);ctx.lineTo(S.cx-18,CANNON_Y+14);ctx.lineTo(S.cx+18,CANNON_Y+14);ctx.closePath();ctx.fill();
+  // HUD
+  ctx.fillStyle='#fff';ctx.textAlign='left';ctx.textBaseline='middle';ctx.font='bold 20px system-ui';
+  ctx.fillText(`Mob left: ${S.ammo}`,14,H-26);
+  ctx.textAlign='right';ctx.fillText(`In field: ${S.men.length}`,W-14,H-26);
+  ctx.textAlign='left';ctx.font='bold 16px system-ui';ctx.fillStyle='#fff9';
+  ctx.fillText(`Lv ${S.lv+1}: ${LEVELS[S.lv].name}`,16,18);
+  if(S.phase==='ready'){
+    ctx.fillStyle='rgba(0,0,0,.55)';rr(40,CANNON_Y-150,W-80,90,14);ctx.fill();
+    ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold 20px system-ui';
+    ctx.fillText('Read the questions. Pick the right answers!',W/2,CANNON_Y-118);
+    ctx.font='17px system-ui';ctx.fillText('Drag to aim · Hold to shoot · Correct gate doubles your mob',W/2,CANNON_Y-86);
+  }
+}
+
+function loop(t){
+  const dt=Math.min(.05,(t-lastT)/1000||0);lastT=t;
+  step(dt);draw();requestAnimationFrame(loop);
+}
+
+// ---------- input ----------
+function px(e){const r=cv.getBoundingClientRect();return (e.clientX-r.left)/r.width*W;}
+cv.addEventListener('pointerdown',e=>{if(!S)return;cv.setPointerCapture(e.pointerId);S.tx=Math.max(MARGIN,Math.min(W-MARGIN,px(e)));S.firing=true;if(S.phase==='ready')S.phase='play';e.preventDefault();});
+cv.addEventListener('pointermove',e=>{if(!S)return;if(e.pointerType==='mouse'||S.firing)S.tx=Math.max(MARGIN,Math.min(W-MARGIN,px(e)));});
+const stopFire=()=>{if(S)S.firing=false;};
+cv.addEventListener('pointerup',stopFire);cv.addEventListener('pointercancel',stopFire);
+addEventListener('keydown',e=>{keys[e.key]=true;if(e.key===' '&&S){S.firing=true;if(S.phase==='ready')S.phase='play';e.preventDefault();}});
+addEventListener('keyup',e=>{keys[e.key]=false;if(e.key===' '&&S)S.firing=false;});
+$('menuBtn').onclick=showMenu;
+
+// ---------- menu ----------
+function showMenu(){
+  S=null;$('result').classList.remove('show');$('menuBtn').style.display='none';
+  let html='<h1>Math Mob</h1><p class="sub">Grade 4 Eureka math · answer gates to grow your mob!</p>';
+  let curMod='',open=false;
+  LEVELS.forEach((L,i)=>{
+    if(L.mod!==curMod){ if(open)html+='</div>'; curMod=L.mod; html+=`<div class="mod">${L.mod}</div><div class="grid">`; open=true; }
+    const locked=i+1>save.unlocked, st=save.stars[i]||0;
+    html+=`<button class="lv ${locked?'locked':''}" data-i="${i}">${locked?'🔒 ':''}${L.name}<small class="stars">${'★'.repeat(st)+'☆'.repeat(3-st)}</small></button>`;
+  });
+  html+='</div><button id="link">Unlock all levels</button>';
+  const m=$('menu');m.innerHTML=html;m.classList.add('show');
+  m.querySelectorAll('.lv:not(.locked)').forEach(b=>b.onclick=()=>startLevel(+b.dataset.i));
+  $('link').onclick=()=>{save.unlocked=LEVELS.length;store();showMenu();};
+}
+
+showMenu();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
