@@ -72,5 +72,16 @@ ok('reflect off floor', rx === 3 && ry === 4);
 [rx, ry] = reflect(3, 4, 0, 1);
 ok('no reflect when moving away', rx === 3 && ry === 4);
 
+// half-resolution layer answers in logical coordinates
+const H2 = createCollisionLayer(480, 800, createCanvas, 0.5);
+H2.clear(); H2.circle(7, 200, 300, 40); H2.rect(8, 50, 600, 100, 20); H2.update();
+eq('half-res circle centre', H2.at(200, 300), 7);
+eq('half-res circle edge inside', H2.at(236, 300), 7);
+eq('half-res circle outside', H2.at(250, 300), 0);
+eq('half-res rect', H2.at(100, 610), 8);
+eq('half-res out of bounds', H2.at(481, 10), 0);
+p = H2.probe(246, 300, 8);
+ok('half-res normal points right', p && p.id === 7 && p.nx > 0.8, JSON.stringify(p));
+
 console.log(`${total - fails}/${total} collision checks passed`);
 process.exit(fails ? 1 : 0);

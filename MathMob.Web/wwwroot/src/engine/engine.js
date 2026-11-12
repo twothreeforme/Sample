@@ -14,7 +14,7 @@ export function createEngine(canvas) {
   canvas.width = W * scale; canvas.height = H * scale;
   const input = createInput(canvas, W, H);
   const scenes = createScenes();
-  const collision = createCollisionLayer(W, H);
+  const collision = createCollisionLayer(W, H, undefined, 0.5);   // half-res: 4x cheaper per-frame read
 
   const loop = createLoop(
     (dt) => { scenes.update(dt); input.endFrame(); },

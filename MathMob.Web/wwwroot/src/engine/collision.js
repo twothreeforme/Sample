@@ -7,24 +7,28 @@
 const defaultCanvas = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
 const TAU = Math.PI * 2;
 
-export function createCollisionLayer(W, H, createCanvas = defaultCanvas) {
-  const canvas = createCanvas(W, H);
+// scale < 1 stores the layer at lower resolution (e.g. 0.5 = 4x cheaper to read each frame);
+// all drawing and query coordinates stay in logical units.
+export function createCollisionLayer(W, H, createCanvas = defaultCanvas, scale = 1) {
+  const PW = Math.round(W * scale), PH = Math.round(H * scale);
+  const canvas = createCanvas(PW, PH);
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
   let data = null;
 
   // id -> colour: each of R,G,B holds one nibble (x16) so anti-aliased edges still decode.
   const color = (id) => `rgb(${(id & 15) * 16},${((id >> 4) & 15) * 16},${((id >> 8) & 15) * 16})`;
 
   function at(x, y) {
-    x = Math.floor(x); y = Math.floor(y);
-    if (!data || x < 0 || y < 0 || x >= W || y >= H) return 0;
-    const i = (y * W + x) * 4;
+    x = Math.floor(x * scale); y = Math.floor(y * scale);
+    if (!data || x < 0 || y < 0 || x >= PW || y >= PH) return 0;
+    const i = (y * PW + x) * 4;
     if (data[i + 3] < 128) return 0;
     return (Math.round(data[i] / 16) & 15) | ((Math.round(data[i + 1] / 16) & 15) << 4) | ((Math.round(data[i + 2] / 16) & 15) << 8);
   }
 
   const layer = {
-    canvas, W, H, at,
+    canvas, W, H, scale, at,
     clear() { ctx.clearRect(0, 0, W, H); data = null; },
     // Draw any path: fn(ctx) builds it, we fill it with the id colour.
     shape(id, fn) { ctx.fillStyle = color(id); ctx.beginPath(); fn(ctx); ctx.fill(); },
@@ -36,7 +40,7 @@ export function createCollisionLayer(W, H, createCanvas = defaultCanvas) {
       ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
     },
     // Snapshot the layer once after drawing; all at()/probe() calls read from this buffer.
-    update() { data = ctx.getImageData(0, 0, W, H).data; },
+    update() { data = ctx.getImageData(0, 0, PW, PH).data; },
     // Hit test with a surface normal: samples a ring of radius r around (x,y).
     // Returns null if nothing solid is touched, else {id, nx, ny} where (nx,ny) points away from the surface.
     probe(x, y, r = 4) {
